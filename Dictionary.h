@@ -2,7 +2,7 @@
 #define L3_DICTIONARY_H
 
 #include "IDictionary.h"
-#include <vector>
+#include "ArraySequence.h"
 #include <stdexcept>
 
 // Реализация Dictionary
@@ -15,16 +15,16 @@ private:
         bool isOccupied = false; // Флаг, занята ли ячейка
     };
 
-    std::vector<KeyValue> table; // Хеш-таблица
+    ArraySequence<KeyValue> table; // Хеш-таблица
     size_t current_size; // Текущее количество элементов
 
     size_t hash(const Key& key) const { // Хеш-функция (использует стандартную хеш-функцию для типа Key)
-        return std::hash<Key>{}(key) % table.size();
+        return std::hash<Key>{}(key) % table.getLength();
     }
 
     void rehash() { // Перехеширование
-        size_t new_capacity = table.size() * 2; // Увеличиваем вместимость вдвое
-        std::vector<KeyValue> new_table(new_capacity); // Создаем новую хеш-таблицу
+        size_t new_capacity = table.getLength() * 2; // Увеличиваем вместимость вдвое
+        ArraySequence<KeyValue> new_table(new_capacity); // Создаем новую хеш-таблицу
 
         for (const auto& entry : table) { // Перебираем все элементы старой таблицы
             if (entry.isOccupied) { // Если ячейка занята
@@ -40,14 +40,19 @@ private:
     }
 
 public:
-    explicit Dictionary(size_t initial_capacity = 16) : table(initial_capacity), current_size(0) {} // Конструктор с параметром по умолчанию
+    explicit Dictionary(size_t initial_capacity = 16) : table(initial_capacity), current_size(0) {
+        for (size_t i = 0; i < initial_capacity; ++i) {
+            table.append({}); // Добавляем элементы с isOccupied = false
+        }
+    }
+ // Конструктор с параметром по умолчанию
 
     size_t count() const override { // Количество элементов
         return current_size;
     }
 
     size_t capacity() const override { // Вместимость
-        return table.size();
+        return table.getLength();
     }
 
     bool contains_key(const Key& key) const override { // Проверка наличия ключа
@@ -61,7 +66,7 @@ public:
             if (table[index].key == key) { // Если ключ найден
                 return true;
             }
-            index = (index + 1) % table.size(); // Переходим к следующей ячейке
+            index = (index + 1) % table.getLength(); // Переходим к следующей ячейке
         } while (index != start_index); // Пока не вернемся в начальную ячейку
         // Используем именно do-while, чтобы хотя бы один раз проверить начальную ячейку
 
@@ -69,7 +74,7 @@ public:
     }
 
     void add(const Key& key, const Value& value) override { // Добавление элемента
-        if (current_size >= table.size() / 2) { // Если таблица заполнена на 50% и более
+        if (current_size >= table.getLength() / 2) { // Если таблица заполнена на 50% и более
             rehash(); // Перехешируем
         }
 
@@ -79,7 +84,7 @@ public:
                 table[index].value = value; // Обновляем значение
                 return; // Завершаем функцию
             }
-            index = (index + 1) % table.size(); // Переходим к следующей ячейке
+            index = (index + 1) % table.getLength(); // Переходим к следующей ячейке
         }
 
         table[index] = {key, value, true}; // Добавляем элемент
@@ -99,7 +104,7 @@ public:
                 --current_size; // Уменьшаем количество элементов
                 return; // Завершаем функцию
             }
-            index = (index + 1) % table.size(); // Переходим к следующей ячейке
+            index = (index + 1) % table.getLength(); // Переходим к следующей ячейке
         } while (index != start_index); // Пока не вернемся в начальную ячейку
 
         throw std::runtime_error("Key not found"); // Если не нашли ключ
@@ -116,7 +121,7 @@ public:
             if (table[index].key == key) { // Если ключ найден
                 return table[index].value; // Возвращаем значение
             }
-            index = (index + 1) % table.size(); // Переходим к следующей ячейке
+            index = (index + 1) % table.getLength(); // Переходим к следующей ячейке
         } while (index != start_index); // Пока не вернемся в начальную ячейку
 
         throw std::runtime_error("Key not found"); // Если не нашли ключ
@@ -133,7 +138,7 @@ public:
             if (table[index].key == key) {
                 return table[index].value;
             }
-            index = (index + 1) % table.size();
+            index = (index + 1) % table.getLength();
         } while (index != start_index);
 
         throw std::runtime_error("Key not found");
@@ -145,10 +150,10 @@ public:
             if (table[index].key == key) {
                 return table[index].value;
             }
-            index = (index + 1) % table.size();
+            index = (index + 1) % table.getLength();
         }
 
-        if (current_size >= table.size() / 2) { // Если таблица заполнена на 50% и более
+        if (current_size >= table.getLength() / 2) { // Если таблица заполнена на 50% и более
             rehash(); // Перехешируем
             return (*this)[key]; // Рекурсивно вызываем оператор с новой таблицей
         }
@@ -156,6 +161,13 @@ public:
         table[index] = {key, Value{}, true}; // Добавляем элемент ({} нужно для Value, чтобы создать пустой объект)
         ++current_size; // Увеличиваем количество элементов
         return table[index].value; // Возвращаем значение
+    }
+
+    void clear() override { // Очистка словаря
+        for (auto& entry : table) { // Перебираем все элементы
+            entry.isOccupied = false; // Освобождаем ячейку
+        }
+        current_size = 0; // Обнуляем количество элементов
     }
 };
 

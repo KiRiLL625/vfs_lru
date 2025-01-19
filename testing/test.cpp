@@ -2,6 +2,76 @@
 #include "../VirtualFileSystem.h"
 #include "../LRUCache.h"
 
+TEST(AVLTree, Insert) {
+    AVLTree<int> tree;
+    tree.insert(1);
+    tree.insert(2);
+    tree.insert(3);
+    tree.insert(4);
+    tree.insert(5);
+    ASSERT_TRUE(tree.contains(1));
+    ASSERT_TRUE(tree.contains(2));
+    ASSERT_TRUE(tree.contains(3));
+    ASSERT_TRUE(tree.contains(4));
+    ASSERT_TRUE(tree.contains(5));
+}
+
+TEST(AVLTree, Remove) {
+    AVLTree<int> tree;
+    tree.insert(1);
+    tree.insert(2);
+    tree.insert(3);
+    tree.insert(4);
+    tree.insert(5);
+    tree.remove(1);
+    tree.remove(3);
+    tree.remove(5);
+    ASSERT_FALSE(tree.contains(1));
+    ASSERT_TRUE(tree.contains(2));
+    ASSERT_FALSE(tree.contains(3));
+    ASSERT_TRUE(tree.contains(4));
+    ASSERT_FALSE(tree.contains(5));
+}
+
+TEST(AVLTree, Contains) {
+    AVLTree<int> tree;
+    tree.insert(1);
+    tree.insert(2);
+    tree.insert(3);
+    tree.insert(4);
+    tree.insert(5);
+    ASSERT_TRUE(tree.contains(1));
+    ASSERT_TRUE(tree.contains(2));
+    ASSERT_TRUE(tree.contains(3));
+    ASSERT_TRUE(tree.contains(4));
+    ASSERT_TRUE(tree.contains(5));
+    tree.remove(1);
+    tree.remove(3);
+    tree.remove(5);
+    ASSERT_FALSE(tree.contains(1));
+    ASSERT_TRUE(tree.contains(2));
+    ASSERT_FALSE(tree.contains(3));
+    ASSERT_TRUE(tree.contains(4));
+    ASSERT_FALSE(tree.contains(5));
+}
+
+TEST(AVLTreeIterator, Iterate) {
+    AVLTree<int> tree;
+    tree.insert(1);
+    tree.insert(2);
+    tree.insert(3);
+    tree.insert(4);
+    tree.insert(5);
+
+    std::vector<int> expected = {1, 2, 3, 4, 5};
+    std::vector<int> actual;
+    for (int key : tree) {
+        actual.push_back(key);
+    }
+
+    ASSERT_EQ(expected, actual);
+}
+
 TEST(Set, Insert) {
     Set<int> set;
     set.insert(1);
@@ -84,6 +154,43 @@ TEST(Dictionary, Contains){
     ASSERT_FALSE(dict.contains_key(3));
     ASSERT_TRUE(dict.contains_key(4));
     ASSERT_FALSE(dict.contains_key(5));
+}
+
+TEST(Dictionary, Get){
+    Dictionary<int, std::string> dict;
+    dict.add(1, "one");
+    dict.add(2, "two");
+    dict.add(3, "three");
+    dict.add(4, "four");
+    dict.add(5, "five");
+    ASSERT_EQ(dict.get(1), "one");
+    ASSERT_EQ(dict.get(2), "two");
+    ASSERT_EQ(dict.get(3), "three");
+    ASSERT_EQ(dict.get(4), "four");
+    ASSERT_EQ(dict.get(5), "five");
+    dict.remove(1);
+    dict.remove(3);
+    dict.remove(5);
+    ASSERT_THROW(dict.get(1), std::runtime_error);
+    ASSERT_EQ(dict.get(2), "two");
+    ASSERT_THROW(dict.get(3), std::runtime_error);
+    ASSERT_EQ(dict.get(4), "four");
+    ASSERT_THROW(dict.get(5), std::runtime_error);
+}
+
+TEST(Dictionary, Clear){
+    Dictionary<int, std::string> dict;
+    dict.add(1, "one");
+    dict.add(2, "two");
+    dict.add(3, "three");
+    dict.add(4, "four");
+    dict.add(5, "five");
+    dict.clear();
+    ASSERT_THROW(dict.get(1), std::runtime_error);
+    ASSERT_THROW(dict.get(2), std::runtime_error);
+    ASSERT_THROW(dict.get(3), std::runtime_error);
+    ASSERT_THROW(dict.get(4), std::runtime_error);
+    ASSERT_THROW(dict.get(5), std::runtime_error);
 }
 
 #include <chrono>

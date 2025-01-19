@@ -13,4 +13,7 @@ add_executable(l3 main.cpp BST.h Set.h
         Dictionary.h
         LRUCache.h
         ICache.h
+        Sequence.h
+        ArraySequence.h
+        DynamicArray.h
 )

@@ -119,8 +119,8 @@ bool menu_cache(LRUCache<std::string, std::string>& cache){
             std::cout << "Enter key: ";
             std::cin >> key;
             try {
-                std::cout << "Value: " << cache.get(key) << std::endl;
                 cache.access(key, cache.get(key));
+                std::cout << "Value: " << cache.get(key) << std::endl;
             }
             catch (std::runtime_error& e) {
                 std::cout << "Key not found. Error: " << e.what() << std::endl;
