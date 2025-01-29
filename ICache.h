@@ -9,6 +9,7 @@ class ICache {
 public:
     virtual void access(const Key& key, const Value& value) = 0; // Добавление элемента в кэш
     virtual bool contains(const Key& key) const = 0; // Проверка наличия элемента в кэше
+    virtual Value& get(const Key& key) = 0;
     virtual const Value& get(const Key& key) const = 0; // Получение значения по ключу
     virtual size_t size() const = 0; // Количество элементов в кэше
     virtual void print() const = 0; // Вывод кэша на экран

@@ -1,155 +1,181 @@
 #ifndef L3_VIRTUALFILESYSTEM_H
 #define L3_VIRTUALFILESYSTEM_H
 
-#include <memory>
 #include <iostream>
-#include <functional>
-#include <filesystem>
-#include "Set.h"
+#include <stdexcept>
+#include <string>
+#include "ArraySequence.h"
+#include "Set.h"  // Подключаем контейнер Set
+#include "Dictionary.h"  // Подключаем хэш-таблицу Dictionary
 
 class VirtualFileSystem {
 private:
-    struct Node { // Структура узла
-        std::string name; // Имя
-        std::string realPath; // Реальный путь (для директорий пустая строка)
-        bool isDirectory; // Флаг директории
-        Set<std::shared_ptr<Node>> children;  // Используем Set для хранения детей (для быстрого поиска), дети - указатели на узлы
-        //shared_ptr используется для того, чтобы не копировать узлы, а хранить указатели на них
+    struct Node {
+        std::string name;
+        std::string realPath;
+        bool isDirectory;
+        Dictionary<std::string, Node*> children;  // Используем Dictionary для хранения дочерних узлов
 
-        Node(std::string name, bool isDirectory, std::string realPath = "") // Конструктор узла
-            : name(std::move(name)), realPath(std::move(realPath)), isDirectory(isDirectory) {}
+        Node(const std::string& name, bool isDirectory, const std::string& realPath = "")
+            : name(name), realPath(realPath), isDirectory(isDirectory) {}
+
+        ~Node() {
+            auto keys = children.keys();  // Получаем все ключи из Dictionary
+            for (size_t i = 0; i < keys.getLength(); ++i) {
+                delete children.get(keys.get(i));  // Удаляем дочерние узлы по ключу
+            }
+        }
+
     };
 
-    std::shared_ptr<Node> root; // Корень
+    Node* root;
+    Set<std::string> uniquePaths;  // Контейнер для хранения уникальных виртуальных путей
 
-    std::shared_ptr<Node> findNode(const std::string &path) { // Поиск узла по пути
-        if (path == "/") { // Если путь - корень
+    Node* findNode(const std::string& path) {
+        if (path == "/") {
             return root;
         }
 
-        std::vector<std::string> parts = splitPath(path); // Разбиваем путь на части
-        auto current = root; // Текущий узел - корень
-        for (const auto &part : parts) { // Проходим по частям пути
-            auto it = std::find_if(current->children.begin(), current->children.end(), [&part](const std::shared_ptr<Node> &child) { // Ищем узел с нужным именем
-                return child->name == part; // Сравниваем имена
-            }); // Итератор на найденный узел
+        ArraySequence<std::string> parts = splitPath(path);
+        Node* current = root;
 
-            if (it == current->children.end() || !(*it)->isDirectory) { // Если узел не найден или это не директория
-                return nullptr; // Возвращаем nullptr
+        for (int i = 0; i < parts.getLength(); ++i) {
+            const std::string& part = parts[i];
+            if (!current->children.contains_key(part)) {
+                return nullptr;  // Узел не найден
             }
-
-            current = *it; // Переходим к следующему узлу
+            current = current->children.get(part);
         }
-        return current; // Возвращаем найденный узел
+
+        return current;
     }
 
-    std::vector<std::string> splitPath(const std::string &path) { // Разбиение пути на части
-        std::vector<std::string> parts; // Вектор частей пути
-        size_t start = 0, end = 0; // Начальная и конечная позиции
-        while ((end = path.find('/', start)) != std::string::npos) { // Пока находим слэш
-            if (end != start) { // Если путь не пустой
-                parts.push_back(path.substr(start, end - start)); // Добавляем часть пути
+    ArraySequence<std::string> splitPath(const std::string& path) {
+        ArraySequence<std::string> parts;
+        size_t start = 0, end = 0;
+
+        while ((end = path.find('/', start)) != std::string::npos) {
+            if (end != start) {
+                parts.append(path.substr(start, end - start));
             }
-            start = end + 1; // Переходим к следующей части
+            start = end + 1;
         }
-        if (start < path.size()) { // Если осталась последняя часть
-            parts.push_back(path.substr(start)); // Просто добавляем её
+
+        if (start < path.size()) {
+            parts.append(path.substr(start));
         }
-        return parts; // Возвращаем вектор частей
+
+        return parts;
     }
 
-    void printTree(const std::shared_ptr<Node> &node, const std::string &prefix, bool isLast) { // Вывод дерева
-        std::cout << prefix << (isLast ? "└── " : "├── ") << node->name; // Выводим имя узла
+    void printTree(Node* node, const std::string& prefix, bool isLast) {
+        if (!node) return;  // Проверяем, что узел существует
 
-        if (!node->isDirectory) { // Если это файл
-            std::cout << " -> " << node->realPath; // Выводим реальный путь
+        std::cout << prefix << (isLast ? "└── " : "├── ") << node->name;
+
+        if (!node->isDirectory) {
+            std::cout << " -> " << node->realPath;
         }
         std::cout << std::endl;
 
-        for (auto it = node->children.begin(); it != node->children.end(); ++it) { // Проходим по детям (узлам)
-            printTree(*it, prefix + (isLast ? "    " : "│   "), std::next(it) == node->children.end()); // Рекурсивно выводим дерево
+        auto keys = node->children.keys();  // Получаем ключи из Dictionary
+        for (size_t i = 0; i < keys.getLength(); ++i) {
+            bool lastChild = (i == keys.getLength() - 1);
+            printTree(node->children.get(keys.get(i)), prefix + (isLast ? "    " : "│   "), lastChild);
         }
     }
+
 
 public:
-    VirtualFileSystem() : root(std::make_shared<Node>("/", true)) {} // Конструктор по умолчанию (корень - истинная директория)
-
-    void addFile(const std::string &virtualPath, const std::string &realPath, const std::string &fileName) { // Добавление файла
-        if (!std::filesystem::exists(realPath)) { // Если реальный путь не существует
-            throw std::runtime_error("Real path does not exist: " + realPath);
-        }
-        auto parent = findNode(virtualPath); // Ищем узел по виртуальному пути
-        if (!parent || !parent->isDirectory) { // Если узел не найден или это не директория
-            throw std::runtime_error("Invalid path: " + virtualPath);
-        }
-
-        auto fileNode = std::make_shared<Node>(fileName, false, realPath); // Создаём узел файла
-        parent->children.insert(fileNode); // Вставляем файл с помощью Set
+    VirtualFileSystem() {
+        root = new Node("/", true);
+        uniquePaths.insert("/");  // Корневой путь
     }
 
-    void addDirectory(const std::string &virtualPath, const std::string &dirName) { // Добавление директории
-        auto parent = findNode(virtualPath); // Ищем узел по виртуальному пути
-        if (!parent || !parent->isDirectory) { // Если узел не найден или это не директория
-            throw std::runtime_error("Invalid path: " + virtualPath);
-        }
-
-        auto dirNode = std::make_shared<Node>(dirName, true); // Создаём узел директории
-        parent->children.insert(dirNode);  // Вставляем директорию с помощью Set
+    ~VirtualFileSystem() {
+        //delete root;
     }
 
-    void removeFile(const std::string &virtualPath, const std::string &fileName) { // Удаление файла
-        auto parent = findNode(virtualPath); // Ищем родительскую директорию
-        if (!parent || !parent->isDirectory) { // Если родитель не найден или не директория
+    void addFile(const std::string& virtualPath, const std::string& realPath, const std::string& fileName) {
+        std::string fullPath = virtualPath + "/" + fileName;
+        if (uniquePaths.contains(fullPath)) {
+            throw std::runtime_error("Path already exists: " + fullPath);
+        }
+
+        Node* parent = findNode(virtualPath);
+        if (!parent || !parent->isDirectory) {
             throw std::runtime_error("Invalid path: " + virtualPath);
         }
 
-        // Ищем файл в дочерних элементах
-        auto it = std::find_if(parent->children.begin(), parent->children.end(),
-                               [&fileName](const std::shared_ptr<Node> &child) {
-                                   return child->name == fileName && !child->isDirectory; // Найдем файл
-                               });
+        Node* fileNode = new Node(fileName, false, realPath);
+        parent->children.add(fileName, fileNode);
+        uniquePaths.insert(fullPath);
+    }
 
-        if (it != parent->children.end()) { // Если файл найден
-            parent->children.remove(*it); // Удаляем файл с помощью метода remove
-            std::cout << "File " << fileName << " removed." << std::endl;
-        } else {
+    void addDirectory(const std::string& virtualPath, const std::string& dirName) {
+        std::string fullPath = virtualPath + "/" + dirName;
+        if (uniquePaths.contains(fullPath)) {
+            throw std::runtime_error("Path already exists: " + fullPath);
+        }
+
+        Node* parent = findNode(virtualPath);
+        if (!parent || !parent->isDirectory) {
+            throw std::runtime_error("Invalid path: " + virtualPath);
+        }
+
+        Node* dirNode = new Node(dirName, true);
+        parent->children.add(dirName, dirNode);
+        uniquePaths.insert(fullPath);
+    }
+
+    void removeFile(const std::string& virtualPath, const std::string& fileName) {
+        Node* parent = findNode(virtualPath);
+        if (!parent || !parent->isDirectory) {
+            throw std::runtime_error("Invalid path: " + virtualPath);
+        }
+
+        if (!parent->children.contains_key(fileName) || parent->children.get(fileName)->isDirectory) {
             throw std::runtime_error("File not found: " + fileName);
         }
+
+        delete parent->children.get(fileName);
+        parent->children.remove(fileName);
+        uniquePaths.remove(virtualPath + "/" + fileName);
     }
 
-    void removeDirectory(const std::string &virtualPath, const std::string &dirName) { // Удаление директории
-        auto parent = findNode(virtualPath); // Ищем родительскую директорию
-        if (!parent || !parent->isDirectory) { // Если родитель не найден или не директория
+    void removeDirectory(const std::string& virtualPath, const std::string& dirName) {
+        Node* parent = findNode(virtualPath);
+        if (!parent || !parent->isDirectory) {
             throw std::runtime_error("Invalid path: " + virtualPath);
         }
 
-        // Ищем директорию среди дочерних элементов
-        auto it = std::find_if(parent->children.begin(), parent->children.end(),
-                               [&dirName](const std::shared_ptr<Node> &child) {
-                                   return child->name == dirName && child->isDirectory; // Найдем директорию
-                               });
-
-        if (it != parent->children.end()) { // Если директория найдена
-            if ((*it)->children.size() == 0) { // Проверяем, что директория пуста
-                parent->children.remove(*it); // Удаляем директорию
-                std::cout << "Directory " << dirName << " removed." << std::endl;
-            } else {
-                throw std::runtime_error("Directory is not empty: " + dirName);
-            }
-        } else {
+        if (!parent->children.contains_key(dirName) || !parent->children.get(dirName)->isDirectory) {
             throw std::runtime_error("Directory not found: " + dirName);
         }
+
+        if (parent->children.get(dirName)->children.count() != 0) {
+            throw std::runtime_error("Directory is not empty: " + dirName);
+        }
+
+        delete parent->children.get(dirName);
+        parent->children.remove(dirName);
+        uniquePaths.remove(virtualPath + "/" + dirName);
     }
 
-
-    void printStructure() { // Вывод структуры
+    void printStructure() {
+        if (!root) {
+            std::cerr << "Tree is empty." << std::endl;
+            return;
+        }
         std::cout << root->name << std::endl;
-        for (auto it = root->children.begin(); it != root->children.end(); ++it) { // Проходим по детям корня
-            printTree(*it, "", std::next(it) == root->children.end()); // Вызываем функцию вывода дерева с нужными параметрами
+
+        auto keys = root->children.keys();  // Получаем ключи из корневого Dictionary
+        for (size_t i = 0; i < keys.getLength(); ++i) {
+            bool lastChild = (i == keys.getLength() - 1);
+            printTree(root->children.get(keys.get(i)), "", lastChild);
         }
     }
+
 };
 
-//Так много shared_ptr из-за того, что Set хранит shared_ptr на узлы, чтобы не копировать их, а хранить указатели
-
-#endif //L3_VIRTUALFILESYSTEM_H
+#endif // L3_VIRTUALFILESYSTEM_H

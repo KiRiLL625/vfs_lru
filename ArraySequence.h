@@ -8,6 +8,7 @@
 #include "Sequence.h"
 #include <stdexcept>
 #include "DynamicArray.h"
+#include <fstream>
 
 std::ostream& operator<<(std::ostream& os, const std::pair<double, int>& p) {
     os << "(" << p.first << ", " << p.second << ")";
@@ -159,31 +160,191 @@ public:
         return last;
     }
 
+    int getCapacity() const {
+        return this->arrayList->getCapacity();
+    }
 
     class Iterator {
     private:
         ArraySequence<T> *arraySequence;
         int index;
     public:
+        using iterator_category = std::random_access_iterator_tag;
+        using value_type = T;
+        using difference_type = std::ptrdiff_t;
+        using pointer = T *;
+        using reference = T &;
+
         Iterator(ArraySequence<T> *arraySequence, int index) : arraySequence(arraySequence), index(index) {}
-        Iterator(const Iterator& it) : arraySequence(it.arraySequence), index(it.index) {}
-        Iterator& operator++() {
+
+        Iterator(const Iterator &it) : arraySequence(it.arraySequence), index(it.index) {}
+
+        Iterator &operator++() {
             index++;
             return *this;
         }
+
         Iterator operator++(int) {
             Iterator it = *this;
             index++;
             return it;
         }
-        bool operator==(const Iterator& it) const {
+
+        Iterator &operator--() {
+            index--;
+            return *this;
+        }
+
+        Iterator operator--(int) {
+            Iterator it = *this;
+            index--;
+            return it;
+        }
+
+        Iterator &operator+=(difference_type n) {
+            index += n;
+            return *this;
+        }
+
+        Iterator operator+(difference_type n) const {
+            return Iterator(arraySequence, index + n);
+        }
+
+        Iterator &operator-=(difference_type n) {
+            index -= n;
+            return *this;
+        }
+
+        Iterator operator-(difference_type n) const {
+            return Iterator(arraySequence, index - n);
+        }
+
+        difference_type operator-(const Iterator &it) const {
+            return index - it.index;
+        }
+
+        bool operator==(const Iterator &it) const {
             return index == it.index;
         }
-        bool operator!=(const Iterator& it) const {
+
+        bool operator!=(const Iterator &it) const {
             return index != it.index;
         }
-        T& operator*() {
+
+        bool operator<(const Iterator &it) const {
+            return index < it.index;
+        }
+
+        bool operator>(const Iterator &it) const {
+            return index > it.index;
+        }
+
+        bool operator<=(const Iterator &it) const {
+            return index <= it.index;
+        }
+
+        bool operator>=(const Iterator &it) const {
+            return index >= it.index;
+        }
+
+        T &operator*() {
             return arraySequence->get(index);
+        }
+
+        T *operator->() {
+            return &arraySequence->get(index);
+        }
+    };
+
+    class ConstIterator {
+    private:
+        const ArraySequence<T> *arraySequence;
+        int index;
+    public:
+        using iterator_category = std::random_access_iterator_tag;
+        using value_type = T;
+        using difference_type = std::ptrdiff_t;
+        using pointer = const T *;
+        using reference = const T &;
+
+        ConstIterator(const ArraySequence<T> *arraySequence, int index) : arraySequence(arraySequence), index(index) {}
+
+        ConstIterator(const ConstIterator &it) : arraySequence(it.arraySequence), index(it.index) {}
+
+        ConstIterator &operator++() {
+            index++;
+            return *this;
+        }
+
+        ConstIterator operator++(int) {
+            ConstIterator it = *this;
+            index++;
+            return it;
+        }
+
+        ConstIterator &operator--() {
+            index--;
+            return *this;
+        }
+
+        ConstIterator operator--(int) {
+            ConstIterator it = *this;
+            index--;
+            return it;
+        }
+
+        ConstIterator &operator+=(difference_type n) {
+            index += n;
+            return *this;
+        }
+
+        ConstIterator operator+(difference_type n) const {
+            return ConstIterator(arraySequence, index + n);
+        }
+
+        ConstIterator &operator-=(difference_type n) {
+            index -= n;
+            return *this;
+        }
+
+        ConstIterator operator-(difference_type n) const {
+            return ConstIterator(arraySequence, index - n);
+        }
+
+        difference_type operator-(const ConstIterator &it) const {
+            return index - it.index;
+        }
+
+        bool operator==(const ConstIterator &it) const {
+            return index == it.index;
+        }
+
+        bool operator!=(const ConstIterator &it) const {
+            return index != it.index;
+        }
+
+        bool operator<(const ConstIterator &it) const {
+            return index < it.index;
+        }
+
+        bool operator>(const ConstIterator &it) const {
+            return index > it.index;
+        }
+
+        bool operator<=(const ConstIterator &it) const {
+            return index <= it.index;
+        }
+
+        bool operator>=(const ConstIterator &it) const {
+            return index >= it.index;
+        }
+
+        const T &operator*() const {
+            return arraySequence->get(index);
+        }
+
+        const T *operator->() const {
+            return &arraySequence->get(index);
         }
     };
 
@@ -195,9 +356,21 @@ public:
         return Iterator(this, this->getLength());
     }
 
-    ~ArraySequence() { //деструктор
-        delete this->arrayList;
+    ConstIterator begin() const {
+        return ConstIterator(this, 0);
     }
+
+    ConstIterator end() const {
+        return ConstIterator(this, this->getLength());
+    }
+
+    ~ArraySequence() {
+        //std::cout << "Deleting ArraySequence, length: " << arrayList->getLength() << std::endl;
+        if (this->arrayList != nullptr) {
+            delete this->arrayList;
+        }
+    }
+
 };
 
 #endif //SEQUENCES_ARRAYSEQUENCE_H

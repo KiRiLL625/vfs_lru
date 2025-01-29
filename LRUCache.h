@@ -4,33 +4,31 @@
 #include "ICache.h"
 #include "Dictionary.h"
 #include "ArraySequence.h"
-#include <list>
 #include <stdexcept>
 
 template <typename Key, typename Value>
 class LRUCache : public ICache<Key, Value> {
 private:
-    size_t capacity;  // Вместимость кэша
-    Dictionary<Key, Value> dictionary;  // Словарь для хранения данных
-    ArraySequence<Key> usageOrder;  // Последовательность ключей для отслеживания порядка использования
-    size_t current_size;  // Текущий размер кэша
+    size_t capacity;
+    Dictionary<Key, Value> dictionary;
+    ArraySequence<Key> usageOrder;
+    Dictionary<Key, size_t> keyPositions;
+    size_t current_size;
 
 public:
     explicit LRUCache(size_t capacity) : capacity(capacity), current_size(0) {}
 
     void access(const Key& key, const Value& value) override {
-        if (current_size >= capacity) {
-            evict();  // Удаляем наименее недавно использованный элемент, если кэш переполнен
-        }
-
         if (dictionary.contains_key(key)) {
-            // Если элемент уже в кэше, обновляем его значение и перемещаем в конец
             dictionary[key] = value;
             moveToEnd(key);
         } else {
-            // Если элемента нет в кэше, добавляем его
+            if (current_size >= capacity) {
+                evict();
+            }
             dictionary.add(key, value);
-            usageOrder.append(key);  // Добавляем ключ в последовательность
+            usageOrder.append(key);
+            keyPositions.add(key, usageOrder.getLength() - 1);  // <--- Запоминаем позицию
             ++current_size;
         }
     }
@@ -39,11 +37,19 @@ public:
         return dictionary.contains_key(key);
     }
 
+    Value& get(const Key& key) override {
+        if (!contains(key)) {
+            throw std::runtime_error("Key not found");
+        }
+        moveToEnd(key);
+        return dictionary.get(key);
+    }
+
     const Value& get(const Key& key) const override {
         if (!contains(key)) {
             throw std::runtime_error("Key not found");
         }
-        return dictionary.get(key);  // Возвращаем значение из словаря
+        return dictionary.get(key);
     }
 
     size_t size() const override {
@@ -61,29 +67,37 @@ public:
     void clear() override {
         dictionary.clear();
         usageOrder.clear();
+        keyPositions.clear();
         current_size = 0;
     }
 
 private:
     void evict() {
-        // Удаляем наименее недавно использованный элемент (первый в последовательности)
+        if (usageOrder.getLength() == 0) {
+            return;
+        }
         Key oldest_key = usageOrder.getFirst();
         dictionary.remove(oldest_key);
-        usageOrder.remove(0);  // Удаляем из последовательности
+        keyPositions.remove(oldest_key);
+        usageOrder.remove(0);
         --current_size;
+
+        // Обновляем позиции всех оставшихся элементов
+        for (size_t i = 0; i < usageOrder.getLength(); ++i) {
+            keyPositions[usageOrder[i]] = i;
+        }
     }
 
     void moveToEnd(const Key& key) {
-        // Перемещаем элемент в конец последовательности (чтобы он был недавно использован)
-        size_t index = 0;
-        for (size_t i = 0; i < usageOrder.getLength(); ++i) {
-            if (usageOrder[i] == key) {
-                index = i;
-                break;
-            }
+        size_t index = keyPositions[key];
+        usageOrder.remove(index);
+        usageOrder.append(key);
+
+        // Обновляем позиции ключей
+        keyPositions[key] = usageOrder.getLength() - 1;
+        for (size_t i = index; i < usageOrder.getLength() - 1; ++i) {
+            keyPositions[usageOrder[i]] = i;
         }
-        usageOrder.remove(index);  // Убираем элемент из текущей позиции
-        usageOrder.append(key);  // Добавляем в конец
     }
 };
 

@@ -2,7 +2,6 @@
 #define BST2_BST_H
 
 #include <functional>
-#include <stack>
 #include <iterator>
 
 template <typename T>
@@ -185,11 +184,11 @@ public:
     class Iterator { // Итератор для обхода дерева
     private:
         Node<T>* current; // Текущий узел
-        std::stack<Node<T>*> nodes; // Стек для хранения узлов
+        ArraySequence<Node<T>*> nodes; // Стек для хранения узлов
 
         void pushLeftmost(Node<T>* node) { // Перемещаемся в самый левый узел
             while (node != nullptr) {
-                nodes.push(node);
+                nodes.append(node);
                 node = node->left;
             }
         }
@@ -203,7 +202,7 @@ public:
 
         explicit Iterator(Node<T>* root) { // Конструктор итератора
             pushLeftmost(root); // Перемещаемся в самый левый узел
-            current = !nodes.empty() ? nodes.top() : nullptr; // Устанавливаем текущий узел
+            current = nodes.getLength() != 0 ? nodes.getLast() : nullptr; // Устанавливаем текущий узел
         }
 
         T operator*() { // Получаем значение текущего узла
@@ -211,11 +210,11 @@ public:
         }
 
         Iterator& operator++() { // Переход к следующему узлу
-            if (!nodes.empty()) {
-                Node<T>* node = nodes.top();
-                nodes.pop();
+            if (nodes.getLength() != 0) {
+                Node<T>* node = nodes.getLast();
+                nodes.removeLast();
                 pushLeftmost(node->right);
-                current = !nodes.empty() ? nodes.top() : nullptr;
+                current = nodes.getLength() != 0 ? nodes.getLast() : nullptr;
             }
             return *this;
         }
